@@ -1,0 +1,13 @@
+installation_folder: /home/bms2017_08/dev/rnaseq_pipeline
+local: YES
+root_directory: /home/bms2017_08/tmp
+experiment_name: tarea2
+number_of_samples: 4
+genome: /home/bms2017_08/downloads/Drosophila_melanogaster.BDGP6.dna.toplevel.fa
+annotation: /home/bms2017_08/downloads/Drosophila_melanogaster.BDGP6.90.gtf
+
+
+sample1: /home/bms2017_08/downloads/SRR518491.sra WT1
+sample2: /home/bms2017_08/downloads/SRR518492.sra WT2
+sample3: /home/bms2017_08/downloads/SRR518493.sra Hp1a_1
+sample4: /home/bms2017_08/downloads/SRR518494.sra Hp1a_2

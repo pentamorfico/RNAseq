@@ -1,0 +1,30 @@
+## This work is licensed under a Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International$
+## Author: Mario Rodríguez Mestre
+## Date: November 2017
+## Email: mariorguez@correo.ugr.es
+
+#$ -S /bin/bash
+#$ -V
+#$ -cwd
+#$ -j yes
+
+WORKING_DIR=$1
+NUMBER_SAMPLES=$2
+INSTALLATION=$3
+
+## Accessing results folder
+cd ${WORKING_DIR}/results
+
+## Merging sample transcriptomes
+stringtie --merge -G ../annotation/annotation.gtf -o stringtie_merged.gtf merge_list.txt
+
+## Comparing our assembly with the reference
+gffcompare -r ../annotation/annotation.gtf -G -o comparison stringtie_merged.gtf
+
+## Submiting scripts for sample quantification
+cd $INSTALLATION
+
+for (( c=1; c<=${NUM_SAMPLES}; c++ ))
+do
+  qsub -N quant$c -o quant$c sample_quantification.sge $c ${WORKING_DIR} ${NUMBER_SAMPLES}
+done

@@ -1,0 +1,70 @@
+## This work is licensed under a Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International$
+## Author: Mario Rodríguez Mestre
+## Date: November 2017
+## Email: mariorguez@correo.ugr.es
+
+#$ -S /bin/bash
+#$ -V
+#$ -cwd
+#$ -j yes
+
+## Naming input parameters
+J=$1
+WORKING_DIR=$2
+SAMPLE=$3
+NUM_SAMPLES=$4
+INSTALLATION=$5
+PARAM_FILE=$6
+LOCAL=$6
+
+SAMPLE_PATH=${WORKING_DIR}/samples/sample${J}
+
+## Downloading sample file
+cd $SAMPLE_PATH
+
+if [ "$LOCAL" == "YES" ]
+then
+    cp $SAMPLE sample${J}.sra
+elif [ "$LOCAL" == "NO" ]
+then
+    wget -O sample${J}.sra $SAMPLE
+fi
+
+# Extracting sample file
+
+fastq-dump --split-files sample${J}.sra
+rm sample${J}.sra
+
+## Sample quality control and read mapping to reference genome
+
+if [ -f sample${J}_2.fastq ]
+then
+   fastqc sample${J}_1.fastq
+   fastqc sample${J}_2.fastq
+   hisat2 --dta -x ${WORKING_DIR}/genome/index -1 sample${J}_1.fastq -2 sample${J}_2.fastq -S sample${J}.sam
+else
+   fastqc sample${J}_1.fastq
+   hisat2 --dta -x ${WORKING_DIR}/genome/index -U sample${J}_1.fastq -S sample${J}.sam
+fi
+
+## Generating sorted bam file
+samtools sort -o sample${J}.bam sample${J}.sam
+rm sample${J}.sam
+samtools index sample${J}.bam
+
+## Transcript assembly
+stringtie -G ../../annotation/annotation.gtf -o sample${J}.gtf -l sample${J} sample${J}.bam
+
+## Communication through a blackboard
+echo "SAMPLE $J DONE" >> ../../log/blackboard_sample_processing.txt
+
+## Preparing merge list file for transcriptome merging
+echo ${SAMPLE_PATH}/sample${J}.gtf >> ../../results/merge_list.txt
+
+SAMPLES_DONE=$( wc -l ../../log/blackboard_sample_processing.txt | awk '{print $1}' )
+
+if [ $SAMPLES_DONE -eq $NUM_SAMPLES ]
+then
+   cd $INSTALLATION
+   qsub -N trans_merge -o trans_merge transcriptome_merging.sge $WORKING_DIR $NUM_SAMPLES $INSTALLATION
+fi

@@ -1,0 +1,88 @@
+## This work is licensed under a Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License.
+## Author: Mario Rodríguez Mestre
+## Date: November 2017
+## Email: mariorguez@correo.ugr.es
+
+#! /bin/bash
+
+## Checking the nubmer of input parameters and printing help message
+if [ "$#" -ne 1 ]
+then
+   echo "You made something incredibly wrong, go study Social Sciences"
+   echo ""
+   echo "This code analyses RNA-seq data, it simply does not tell you how to
+        improve as bioinformatician"
+   echo "For dummies: rnaseq_pipeline <param_file>"
+   echo "    param_file: file input name. If you are still lost, see below
+        example"
+   echo ""
+   echo ""
+
+   exit 1
+fi
+
+## A single input is expected containing the parameter file
+PARAM_FILE=$1
+
+## Lee los parámetros y crea variables buscando las líneas con palabra tras
+## 'grep' y haciendo un print de la segunda variable (tras "var:" en param_file)
+
+LOCAL=$( grep local: $PARAM_FILE | awk '{print $2}' )
+INSTALLATION=$( grep installation_folder: $PARAM_FILE | awk '{print $2}')
+ROOT_DIR=$( grep root_directory: $PARAM_FILE | awk '{print $2}')
+EXP_NAME=$( grep experiment_name: $PARAM_FILE | awk '{print $2}')
+NUM_SAMPLES=$( grep number_of_samples: $PARAM_FILE | awk '{print $2}')
+GENOME=$( grep genome: $PARAM_FILE | awk '{print $2}')
+ANNOTATION=$( grep annotation: $PARAM_FILE | awk '{print $2}' )
+WORKING_DIR=${ROOT_DIR}/${EXP_NAME}
+
+## Building working directory structure
+cd $ROOT_DIR
+mkdir $EXP_NAME
+cd $EXP_NAME
+mkdir genome annotation results samples log
+cd samples
+
+for (( c=1; c<=${NUM_SAMPLES}; c++ ))
+do
+   mkdir sample$c
+done
+
+## Copying reference genome and annotation
+if [ "$LOCAL" == "YES" ]
+then
+    cd $WORKING_DIR/genome
+    cp $GENOME genome.fa
+    cd $WORKING_DIR/annotation
+    cp $ANNOTATION annotation.gtf
+elif [ "$LOCAL" == "NO" ]
+then
+    cd $WORKING_DIR/genome
+    wget -O genome.fa.gz $GENOME
+    gunzip genome.fa.gz
+    cd $WORKING_DIR/annotation
+    wget -O annotation.gtf.gz $ANNOTATION
+    gunzip annotation.gtf.gz
+fi
+
+echo "GENOME AND REFERENCE DOWNLOADED SUCCESSFULLY" > $ROOT_DIR/$EXP_NAME/log/log.txt
+
+## Building reference genome index
+cd $WORKING_DIR/genome
+extract_splice_sites.py $WORKING_DIR/annotation/annotation.gtf > splices_sites.ss
+extract_exons.py $WORKING_DIR/annotation/annotation.gtf > exons.exon
+hisat2-build --ss splices_sites.ss --exon exons.exon genome.fa index
+
+echo "REFERENCE GENOME INDEX DONE" >> $WORKING_DIR/log/log.txt
+
+echo "WORKING DIRECTORY DONE" >> $WORKING_DIR/log/log.txt
+
+## Parallel sample processing
+cd $INSTALLATION
+
+for (( c=1; c<=${NUM_SAMPLES}; c++ ))
+do
+  SAMPLE=$( grep sample${c}: $PARAM_FILE | awk '{print _$2}' )
+  qsub -N sample$c -o sample$c sample_processing.sge $c $WORKING_DIR $SAMPLE $NUM_SAMPLES $INSTALLATION $PARAM_FILE $LOCAL
+  echo "PROCESSING SAMPLE $c" >> $WORKING_DIR/log/log.txt
+done

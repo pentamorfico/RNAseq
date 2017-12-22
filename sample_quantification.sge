@@ -1,0 +1,31 @@
+## This work is licensed under a Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International$
+## Author: Mario Rodríguez Mestre
+## Date: November 2017
+## Email: mariorguez@correo.ugr.es
+
+#$ -S /bin/bash
+#$ -V
+#$ -cwd
+#$ -j yes
+
+J=$1
+WORKING_DIR=$2
+NO_SAMPLES=$3
+
+## Accesing sample folder
+cd ${WORKING_DIR}/samples/sample$J
+
+## Gene Expression Quantification
+stringtie -e -B -G ../../results/stringtie_merged.gtf -o sample$J.gtf sample$J.bam
+
+## Writing on the blackboard
+echo "SAMPLE $J QUANTIFIED" >> ${WORKING_DIR}/log/quantification_blackboard.txt
+
+## Checking number of quantified samples for synchronization
+QUANT_SAMPLES=$( wc -l ${WORKING_DIR}/log/quantification_blackboard.txt | awk '{print $1}' )
+
+if [ $QUANT_SAMPLES -eq $NO_SAMPLES ]
+then
+   echo "ANALYSIS FINISHED SUCCESSFULLY"
+   echo "Viva tu"
+fi
