@@ -40,7 +40,7 @@ indices = match(results.genes$id, texpr(bg.data, 'all')$gene_id)
 gene_names_for_result = texpr(bg.data, 'all')$gene_name[indices]
 results.genes = data.frame(geneNames=gene_names_for_result, results.genes)
 
-## Previsualizamos la similitud entre las réplicas
+## Scatterplot replicas
 d = data.frame( wt1 = log2(gene.expression[,1]+1) )
 d$wt2 <- log2(gene.expression[,2]+1)
 d$Hp1a_1 = log2(gene.expression[,3]+1)
@@ -58,11 +58,10 @@ ggarrange(p1, p2,
           labels = c("WT", "Hp1a"),
           ncol = 2, nrow = 1)
 
-## Construimos un boxplot para comprobar que las distribuciones globales de las
-## muestras son similares y comparables.
+## Boxplot
 ggplot(stack(d), aes(x=ind, y=values, fill=ind)) + geom_boxplot() + theme_minimal() + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.title.x=element_blank(), axis.title.y=element_blank())+ scale_color_gradient(low = "#0091ff", high = "#f0650e")
 
-## Calculamos la matrix de expresión media.
+## Mean expression matrix
 head(gene.expression)
 wt <- (gene.expression[,"WT1"] + gene.expression[,"WT2"])/2
 hp1a <- (gene.expression[,"Hp1a_1"] + gene.expression[,"Hp1a_2"])/2
@@ -70,7 +69,7 @@ mean.expression <- matrix(c(wt,hp1a),ncol=2)
 colnames(mean.expression) <- c("wt","hp1a")
 rownames(mean.expression) <- rownames(gene.expression)
 
-## Previsualizamos el efecto de la mutación en un scatterplot.
+## Scatterplot condition1 vs condition2
 d2 = data.frame( wt = log2(wt+1) )
 d2$hp1a <- log2(hp1a+1)
 
@@ -79,21 +78,21 @@ p1 = ggplot(d2,aes(wt, hp1a, color=wt)) +
   theme_minimal() + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+ scale_color_gradient(low = "#0091ff", high = "#f0650e")
 p1
 
-## Resaltar activados y reprimidos
+## Get DGEs by fold change
 log2fc <- log2((hp1a+1)/(wt+1))
 activated.genes <- names(which(log2fc > 2))
 repressed.genes <- names(which(log2fc < -2))
 length(activated.genes)
 length(repressed.genes)
 
-## Guardamos en ficheros en formato txt los genes expresados de forma diferencial.
+## Save DGEs
 activated.genes.df <- subset(results.genes, id %in% activated.genes)
 write.table(x = activated.genes.df[,1],file = "activated_genes.txt",quote = FALSE,row.names = FALSE,sep = "\t")
 length(repressed.genes.df[,2])
 repressed.genes.df <- subset(results.genes, id %in% repressed.genes)
 write.table(x = repressed.genes.df[,1],file = "repressed_genes.txt",quote = FALSE,row.names = FALSE,sep = "\t")
 
-## Resaltar activados y reprimidos
+## Scatterplot DGEs
 unregulated=setdiff(names(wt), names(wt[activated.genes]))
 unregulated=setdiff(unregulated, names(wt[repressed.genes]))
 
@@ -109,8 +108,9 @@ ggplot(dataframe_plot, aes(x=wt, y=hp1a, color=DEGs)) +
   theme(legend.position="top") + theme_minimal() +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
 
-## Las siguientes instrucciones realizan un análisis de enriquecimiento de términos GO
-## y rutas metabólicas usando los paquetes clusterProfiler y pathview.
+## Gene Ontology term enrichment
+
+### Activados ###
 
 eg.activated = bitr(activated.genes.df[,1], fromType="SYMBOL", toType="ENTREZID", OrgDb="org.Dm.eg.db")
 ids.activated = bitr(activated.genes.df[,1], fromType="SYMBOL", toType=c("UNIPROT", "ENSEMBL"), OrgDb="org.Dm.eg.db")
@@ -136,6 +136,7 @@ for(i in 1:length(pathways.activated.id))
            limit = list(gene = max(activated.genes.df[,4]),cpd = 1),gene.idtype="KEGG")
 }
 
+### Reprimidos ###
 
 eg.repressed = bitr(repressed.genes.df[,1], fromType="SYMBOL", toType="ENTREZID", OrgDb="org.Dm.eg.db")
 ids.repressed = bitr(repressed.genes.df[,1], fromType="SYMBOL", toType=c("UNIPROT", "ENSEMBL"), OrgDb="org.Dm.eg.db")
@@ -161,21 +162,21 @@ for(i in 1:length(pathways.repressed.id))
            limit = list(gene = max(repressed.genes.df[,4]),cpd = 1),gene.idtype="KEGG")
 }
 
-## Plotting setup
+## Getting barplots and transcript expression
+
 tropical <- c('darkorange', 'dodgerblue', 'hotpink', 'limegreen', 'yellow')
 palette(tropical)
 
-#Getting the less expressed genes
-activated.genes.df %>% arrange(fc)
+#Getting the identifier of DGEs
+activated.genes.df %>% arrange(fc) #Shows the activated genes by fc
 identifier <- names(which(ballgown::geneIDs(bg.data) == "MSTRG.2592"))
 identifier=identifier[1]
 
-## Plotting gene abundance distribution
+## Plot individual transcripts
 fpkm <- texpr(bg.data, meas='FPKM')
 fpkm <- log2(fpkm +1)
 colnames(fpkm) <- c("WT1","WT2","Hp1a_1","Hp1a_2")
 
-## Plot individual transcripts
 ballgown::transcriptNames(bg.data.filt)[identifier]
 plot(fpkm[identifier,] ~ pheno.data$genotype, border=c(1,2),
      main=paste(ballgown::geneNames(bg.data)[identifier], ' : ',ballgown::transcriptNames(bg.data)[identifier]),
